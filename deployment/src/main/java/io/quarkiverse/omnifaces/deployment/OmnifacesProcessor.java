@@ -1,15 +1,13 @@
 package io.quarkiverse.omnifaces.deployment;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import javax.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.ApplicationScoped;
 
-import org.apache.myfaces.cdi.view.ViewScopeBeanHolder;
 import org.jboss.jandex.AnnotationInstance;
 import org.jboss.jandex.AnnotationTarget;
 import org.jboss.jandex.ClassInfo;
@@ -32,11 +30,9 @@ import org.omnifaces.resourcehandler.CombinedResourceHandler;
 
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.arc.deployment.AnnotationsTransformerBuildItem;
-import io.quarkus.arc.deployment.BeanArchiveIndexBuildItem;
 import io.quarkus.arc.deployment.BeanDefiningAnnotationBuildItem;
 import io.quarkus.arc.deployment.ContextRegistrationPhaseBuildItem;
 import io.quarkus.arc.deployment.ContextRegistrationPhaseBuildItem.ContextConfiguratorBuildItem;
-import io.quarkus.arc.deployment.CustomScopeAnnotationsBuildItem;
 import io.quarkus.arc.deployment.CustomScopeBuildItem;
 import io.quarkus.arc.processor.AnnotationsTransformer;
 import io.quarkus.deployment.annotations.BuildProducer;
@@ -64,7 +60,7 @@ class OmnifacesProcessor {
     static final DotName OMNIFACES_STARTUP = DotName.createSimple(Startup.class.getName());
     static final DotName OMNIFACES_EAGER = DotName.createSimple(Eager.class.getName());
 
-    private static final Class[] BEAN_CLASSES = {
+    private static final Class<?>[] BEAN_CLASSES = {
             EagerBeansRepository.class,
             ValidatorManager.class,
             ViewScopeManager.class,
@@ -90,7 +86,7 @@ class OmnifacesProcessor {
 
     @BuildStep
     void buildCdiBeans(BuildProducer<AdditionalBeanBuildItem> additionalBean,
-            BuildProducer<BeanDefiningAnnotationBuildItem> beanDefiningAnnotation) throws IOException {
+            BuildProducer<BeanDefiningAnnotationBuildItem> beanDefiningAnnotation) {
         for (Class<?> clazz : BEAN_CLASSES) {
             additionalBean.produce(AdditionalBeanBuildItem.unremovableOf(clazz));
         }
@@ -127,12 +123,10 @@ class OmnifacesProcessor {
 
     @BuildStep
     @Record(ExecutionTime.STATIC_INIT)
-    void buildAnnotationProviderIntegration(OmniFacesRecorder recorder, CombinedIndexBuildItem combinedIndex)
-            throws IOException {
+    void buildAnnotationProviderIntegration(OmniFacesRecorder recorder, CombinedIndexBuildItem combinedIndex) {
         for (String clazz : BEAN_DEFINING_ANNOTATION_CLASSES) {
             combinedIndex.getIndex()
                     .getAnnotations(DotName.createSimple(clazz))
-                    .stream()
                     .forEach(annotation -> {
                         if (annotation.target().kind() == AnnotationTarget.Kind.CLASS) {
                             recorder.registerAnnotatedClass(annotation.name().toString(),
@@ -179,19 +173,11 @@ class OmnifacesProcessor {
                 "org.primefaces.extensions.util.PhoneNumberUtilWrapper",
                 "org.primefaces.extensions.util.URLEncoderWrapper"));
 
-        // TODO: Register CDI produced servlet objects (being fixed in MyFaces 2.3-M8)
-        classNames.add(io.undertow.servlet.spec.HttpServletRequestImpl.class.getName());
-        classNames.add(io.undertow.servlet.spec.HttpServletResponseImpl.class.getName());
-        classNames.add(io.undertow.servlet.spec.HttpSessionImpl.class.getName());
-
-        reflectiveClass.produce(new ReflectiveClassBuildItem(true, false, classNames.toArray(new String[classNames.size()])));
+        reflectiveClass.produce(new ReflectiveClassBuildItem(true, false, classNames.toArray(new String[0])));
 
         // Register org.omnifaces.config.WebXmlSingleton to be initialized at runtime, it uses a static code
         NativeImageConfigBuildItem.Builder builder = NativeImageConfigBuildItem.builder();
         builder.addRuntimeInitializedClass("org.omnifaces.config.WebXmlSingleton");
-
-        // TODO: being fixed in MyFaces 2.3-M8
-        builder.addRuntimeInitializedClass(ViewScopeBeanHolder.class.getName());
 
         return builder.build();
     }
@@ -207,7 +193,7 @@ class OmnifacesProcessor {
                 "META-INF/beans.xml",
                 "org/omnifaces/messages.properties",
                 "META-INF/rsc/myfaces-dev-error-include.xml",
-                "META-INF/services/javax.servlet.ServletContainerInitializer",
+                "META-INF/services/jakarta.servlet.ServletContainerInitializer",
                 "META-INF/maven/org.omnifaces/omnifaces/pom.properties",
                 "META-INF/resources/omnifaces/fixviewstate.js",
                 "META-INF/resources/omnifaces/omnifaces.js",
@@ -217,7 +203,7 @@ class OmnifacesProcessor {
     }
 
     @BuildStep
-    void buildRecommendedInitParams(BuildProducer<ServletInitParamBuildItem> initParam) throws IOException {
+    void buildRecommendedInitParams(BuildProducer<ServletInitParamBuildItem> initParam) {
 
         //disables combined resource handler in dev mode
         if (LaunchMode.DEVELOPMENT.getDefaultProfile().equals(ProfileManager.getActiveProfile())) {
@@ -230,8 +216,7 @@ class OmnifacesProcessor {
      * annotations for ApplicationScoped and Startup.
      */
     @BuildStep
-    AnnotationsTransformerBuildItem transformBeanScope(BeanArchiveIndexBuildItem index,
-            CustomScopeAnnotationsBuildItem scopes) {
+    AnnotationsTransformerBuildItem transformBeanScope() {
         return new AnnotationsTransformerBuildItem(new AnnotationsTransformer() {
             @Override
             public boolean appliesTo(AnnotationTarget.Kind kind) {
@@ -259,12 +244,11 @@ class OmnifacesProcessor {
     }
 
     public List<String> collectClassesInPackage(CombinedIndexBuildItem combinedIndex, String packageName) {
-        List<String> classes = combinedIndex.getIndex()
+        return combinedIndex.getIndex()
                 .getClassesInPackage(packageName)
                 .stream()
                 .map(ClassInfo::toString)
                 .collect(Collectors.toList());
-        return classes;
     }
 
     public List<String> collectSubclasses(CombinedIndexBuildItem combinedIndex, String className) {

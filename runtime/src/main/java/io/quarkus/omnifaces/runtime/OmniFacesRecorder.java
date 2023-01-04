@@ -36,7 +36,6 @@ public class OmniFacesRecorder {
     public void registerAnnotatedClass(String annotationName, String clazzName) {
         Class<? extends Annotation> annotation = (Class<? extends Annotation>) ClassUtils.simpleClassForName(annotationName);
         Class<?> clazz = ClassUtils.simpleClassForName(clazzName);
-
         Set<Class<?>> classes = ANNOTATED_CLASSES.computeIfAbsent(annotation, $ -> new HashSet<>());
         classes.add(clazz);
     }
